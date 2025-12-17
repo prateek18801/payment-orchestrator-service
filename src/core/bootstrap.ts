@@ -5,26 +5,41 @@ import { PaymentController } from "#controller/PaymentController.js";
 import { PaymentValidator } from "#validator/PaymentValidator.js";
 import { IdempotencyRepository } from "#repository/idempotencyRepository.js";
 import { IdempotencyHandler } from "#middleware/idempotencyHandler.js";
+import { ILogger, Logger } from "#util/Logger.js";
 
 export function bootstrapDependencies(): void {
+  // Register Logger as Singleton
+  container.register(
+    'Logger',
+    () => Logger.getInstance(),
+    true
+  );
+
+  // Register IdempotencyRepository as Singleton
   container.register(
     'IdempotencyRepository',
     () => IdempotencyRepository.getInstance(),
     true
   );
 
+  // Register PaymentProvider as Singleton with Logger dependency
   container.register(
     'PaymentProvider',
-    () => PaymentProvider.getInstance(),
+    () => {
+      const logger = container.get<ILogger>('Logger');
+      return PaymentProvider.getInstance(logger);
+    },
     true
   );
 
+  // Register PaymentValidator as Singleton
   container.register(
     'PaymentValidator',
     () => new PaymentValidator(),
     true
   );
 
+  // Register IdempotencyHandler with its dependencies
   container.register(
     'IdempotencyHandler',
     () => {
@@ -34,15 +49,18 @@ export function bootstrapDependencies(): void {
     true
   );
 
+  // Register PaymentService with its dependencies
   container.register(
     'PaymentService',
     () => {
       const provider = container.get<PaymentProvider>('PaymentProvider');
-      return new PaymentService(provider);
+      const logger = container.get<ILogger>('Logger');
+      return new PaymentService(provider, logger);
     },
     true
   );
 
+  // Register PaymentController with its dependencies
   container.register(
     'PaymentController',
     () => {
