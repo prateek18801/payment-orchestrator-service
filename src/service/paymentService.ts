@@ -1,41 +1,67 @@
-import { PaymentProvider } from "./PaymentProvider.js";
+import { IPaymentProvider } from "./PaymentProvider.js";
 
-const provider = new PaymentProvider();
+export interface IPaymentService {
+  processPayment(payload: IPaymentPayload): Promise<IPaymentResult>;
+}
 
-export const makePayment = async (payload: any) => {
+export interface IPaymentPayload {
+  amount: number;
+  currency: string;
+  beneficiary: any;
+}
 
-  const auth = await provider.auth();
-
-  const beneficiary = await provider.createBeneficiary(auth.accessToken, payload.beneficiary);
-
-  const quote = await provider.createQuote(auth.accessToken, {
-    amount: payload.amount,
-    currency: payload.currency,
-    beneficiaryId: beneficiary.beneficiaryId,
-  });
-
-  let order;
-  try {
-    order = await provider.createOrder(auth.accessToken, {
-      quoteId: quote.quoteId,
-    });
-  } catch (error: any) {
-    if (error.statusCode === 503) {
-      order = await provider.createOrder(auth.accessToken, { quoteId: quote.quoteId });
-    } else {
-      throw error;
-    }
-  }
-
-  return {
-    orderId: order.orderId,
-    status: order.status,
-    quoteInfo: {
-      id: quote.quoteId,
-      total: quote.totalAmount,
-      fee: quote.fee,
-    },
-    beneficiaryId: beneficiary.beneficiaryId,
+export interface IPaymentResult {
+  orderId: string | number;
+  status: string;
+  quoteInfo: {
+    id: string | number;
+    total: number;
+    fee: number;
   };
+  beneficiaryId: any;
+}
 
+export class PaymentService implements IPaymentService {
+
+  constructor(private paymentProvider: IPaymentProvider) { }
+
+  async processPayment(payload: IPaymentPayload): Promise<IPaymentResult> {
+    const auth = await this.paymentProvider.auth();
+    const beneficiary = await this.paymentProvider.createBeneficiary(
+      auth.accessToken,
+      payload.beneficiary
+    );
+
+    const quote = await this.paymentProvider.createQuote(auth.accessToken, {
+      amount: payload.amount,
+      currency: payload.currency,
+      beneficiaryId: beneficiary.beneficiaryId,
+    });
+
+    let order;
+    try {
+      order = await this.paymentProvider.createOrder(auth.accessToken, {
+        quoteId: quote.quoteId,
+      });
+    } catch (error: any) {
+      if (error.statusCode === 503) {
+        order = await this.paymentProvider.createOrder(auth.accessToken, {
+          quoteId: quote.quoteId,
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    return {
+      orderId: order.orderId,
+      status: order.status,
+      quoteInfo: {
+        id: quote.quoteId,
+        total: quote.totalAmount,
+        fee: quote.fee,
+      },
+      beneficiaryId: beneficiary.beneficiaryId,
+    };
+  }
 }
